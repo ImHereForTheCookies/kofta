@@ -1,0 +1,181 @@
+from confluent_kafka import Consumer, TopicPartition
+from util.decorators import save_offsets
+
+import json
+import time
+from tqdm import tqdm
+
+
+class KafkaStreamer(Consumer):
+    def __init__(self, kafka_address, topic_name, *args, timeout=30, configs: dict={}, offset_file=None, **kwargs):
+        self.kafka_address = kafka_address
+        self.topic_name = topic_name
+        self.timeout = timeout
+        self.message_count = 0
+        self.file = offset_file
+        self.messages = []
+
+        consumer_configs = {'bootstrap.servers': self.kafka_address, 'group.id': self.topic_name}
+        consumer_configs.update(configs)
+
+        super().__init__(consumer_configs, *args, **kwargs)
+        # Meta data for partition info
+        topic_partition_keys = self.list_topics(self.topic_name).topics[self.topic_name].partitions.keys()
+        self.topic_partitions = [TopicPartition(self.topic_name, partition=key, offset=0) for key in topic_partition_keys]
+
+        # Set to beginning by default
+        # TODO: Should this work for user specified offset in __init__?
+        self.assign(self.topic_partitions)
+
+    def __iter__(self):
+        self.count = 0
+        return self
+
+    def __next__(self):
+        self.message = self.poll(timeout=self.timeout)
+        self.message_count += 1
+        if self.message is None:
+            raise EOFError
+        self.message = json.loads(self.message.value().decode('utf-8'))
+        return self.message
+
+    def __len__(self):
+        total = 0
+        for partition in self.topic_partitions:
+            total += self.get_watermark_offsets(partition)[1]
+        return total
+
+    @property
+    def partitions(self):
+        return self.position(self.topic_partitions)
+
+    @partitions.setter
+    def partitions(self, params: dict):
+        """
+        Sets
+        Args:
+            params:
+
+        Returns:
+
+        """
+        topic_name = params.get('topic_name', self.topic_name)
+        offsets = params.get('offsets', [0] * len(self.topic_partitions))
+        offsets = [offsets] * len(self.topic_partitions) if type(offsets) == int else offsets
+        partitions = params.get('partitions', range(len(self.topic_partitions)))
+
+        assert len(offsets) == len(partitions), "Number of partitions and offsets must be the same."
+
+        self.topic_partitions = [TopicPartition(topic_name, partition, offset) for partition, offset in zip(partitions, offsets)]
+        self.assign(self.topic_partitions)
+        time.sleep(1)
+
+    # def save_partitions(self, save_path):
+    #     with open(save_path, 'wb') as f:
+    #         pickle.dump(self.partitions, f)
+
+
+class KafkaReader(KafkaStreamer):
+    @save_offsets
+    def read_topic(self, num_messages: int = -1, **kwargs):
+        """
+        Reads a specified number of messages in a topic.
+        Args:
+            num_messages: Number of messages to read.
+            **kwargs: To be passed to decorator whether you want kafka offset locations saved/loaded. Use arguments:
+                        file: Path to save/load from.
+                        load: Whether to attempt to load files from this location. (Bool)
+
+        Returns: A list of messages
+
+        """
+        self.messages = []
+        if num_messages == -1:
+            num_messages = len(self)
+        for message in tqdm(self, total=num_messages):
+            self.messages.append(message)
+            if self.message_count == num_messages:
+                break
+
+
+class StreamCache(KafkaStreamer):
+    def __init__(self, kafka_address: str, cache_size: int, timeout: int = 30, **kwargs):
+        kafka_params = {'bootstrap.servers': kafka_address,
+                        'group.id': 'cache_test'}
+        kafka_params.update(kwargs)
+        super().__init__(self, kafka_params, timeout=timeout)
+        self.cache_size = cache_size
+        self.cache = []
+
+    def test_function(self):
+        raise NotImplementedError
+
+    @save_offsets
+    def analyze_topic(self, topic_name: str, num_messages: int = -1, *args, **kwargs):
+        """
+        Pass a function that has a logical test using the cached information. If the test breaks it will return False.
+        The function will read as many rows as you'd like to test.
+        Args:
+            topic_name: Which topic to read from.
+            num_messages: How many messages to test. Defaults to all messages.
+            kwargs: Specify a list of offsets and partitions for the topic.
+
+        Returns:
+            a boolean signifying whether or not the testing passed.
+
+        """
+        self.cache = []
+        self.assign_partition(topic_name, **kwargs)
+        # adds a total estimate for the progress bar if true, otherwise shows normal iteration progress
+        if num_messages == -1:
+            num_messages = len(topic_name)
+        for count, message in tqdm(enumerate(self), total=num_messages):
+            # Comes first since count starts at 0
+            if count == num_messages:
+                break
+            # Checks cache if full before carrying out operations
+            self.cache.append(message)
+            if len(self.cache) > self.cache_size:
+                del self.cache[0]
+            else:
+                continue
+            # Checks if the function criteria was met for cache state
+            if not self.test_function(*args, **kwargs):
+                return False
+
+        return True
+
+
+class KafkaTransformer(KafkaStreamer):
+    def mutator(self, message):
+        raise NotImplementedError
+
+    def transform_message(self):
+        pass
+
+
+if __name__ == "__main__":
+    test = KafkaReader(kafka_address='kafka-cogynt-gadoc.threatdeterrence.com:31090', topic_name="suicide_risk")
+    suicide_risk = test.read_topic()
+    print('f')
+#     NUM_MESSAGES = 100000
+#     admin = AdminClient({'bootstrap.servers': 'localhost:9092'})
+#     consumer = KafkaReader({'bootstrap.servers': 'localhost:9092',
+#                             'group.id': 'consumer_test'},
+#                            timeout=1)
+#     producer = Producer({'bootstrap.servers': 'localhost:9092'})
+#
+#     admin.delete_topics(['unit_test'])
+#     time.sleep(1)
+#
+#     sent_messages = []
+#     for i in range(NUM_MESSAGES):
+#         sent_message = {'field': i}
+#         sent_messages.append(sent_message)
+#         producer.produce('unit_test',
+#                          value=json.dumps(sent_message))
+#
+#     read_messages = consumer.read_topic('unit_test')
+#
+#     assert sent_messages == read_messages, 'Unit test failed for reading messages'
+#     assert consumer.total_messages('unit_test') == NUM_MESSAGES, "Unit test failed for counting messages"
