@@ -1,6 +1,6 @@
 import pickle
 from .. import KafkaStreamer
-from util import offset_storage
+from util import save_offsets
 import re
 
 
@@ -13,7 +13,7 @@ class KafkaParser(KafkaStreamer):
     def parser(self):
         raise NotImplementedError
 
-    @offset_storage
+    @save_offsets
     def save_messages(self, field_name: str, save_file: str, **kwargs):
         topic_name = kwargs.get("topic_name", False)
         if topic_name:
@@ -33,7 +33,7 @@ class KafkaParser(KafkaStreamer):
                 else:
                     f.write(message + "\n")
 
-    @offset_storage
+    @save_offsets
     def store_messages(self, field_name: str, **kwargs):
         topic_name = kwargs.get("topic_name", False)
         if kwargs.get("clear_messages", False):

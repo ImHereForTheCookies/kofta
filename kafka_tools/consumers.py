@@ -1,18 +1,23 @@
 from confluent_kafka import Consumer, TopicPartition
-from util.decorators import offset_storage
+from util.decorators import save_offsets
 
 import json
 from tqdm import tqdm
+import pickle
 
 
 class KafkaStreamer(Consumer):
-    def __init__(self, kafka_address, topic_name, *args, timeout=30, configs: dict = None, offset_file=None, load=False,
+    def __init__(self, kafka_address: str,
+                 topic_name: str,
+                 *args,  # stops unnamed args after topic_name
+                 timeout: int = 30,
+                 configs: dict = None,
+                 offset_file: str = None,
                  **kwargs):
         self.kafka_address = kafka_address
         self._topic_name = topic_name
         self.timeout = timeout
         self.message_count = 0
-        self.file_path = offset_file
         self.messages = []
 
         # Don't want to default to dict since mutable
@@ -23,8 +28,13 @@ class KafkaStreamer(Consumer):
 
         super().__init__(consumer_configs, *args, **kwargs)
         # Meta data for partition info
-        topic_partition_keys = self.list_topics(self.topic_name).topics[self.topic_name].partitions.keys()
-        self.topic_partitions = [TopicPartition(self.topic_name, partition=key, offset=0) for key in topic_partition_keys]
+        if offset_file is None:
+            topic_partition_keys = self.list_topics(self.topic_name).topics[self.topic_name].partitions.keys()
+            self.topic_partitions = [TopicPartition(self.topic_name, partition=partition, offset=0) for partition in topic_partition_keys]
+
+        # Sets partitions to values form a specified load file
+        if offset_file is not None:
+            self.topic_partitions = pickle.load(offset_file)
 
         # Set to beginning by default
         # TODO: Should this work for user specified offset in __init__?
@@ -53,7 +63,7 @@ class KafkaStreamer(Consumer):
         return self.position(self.topic_partitions)
 
     @partitions.setter
-    def partitions(self, params: list):
+    def partitions(self, params: list or str):
         """
         Sets
         Args:
@@ -62,22 +72,30 @@ class KafkaStreamer(Consumer):
         Returns:
 
         """
+        if isinstance(params, str):
+            with open(params, 'rb') as f:
+                params = pickle.load(f)
         self.assign(params)
         self.topic_partitions = params
 
-    def partition_factory(self, topic_name: str, partitions: list, offsets: list):
-        pass
+    # def partition_factory(self, topic_name: str, partitions: list, offsets: list):
+    #     pass
+
     @property
     def topic_name(self):
         return self._topic_name
-    # def save_partitions(self, save_path):
-    #     with open(save_path, 'wb') as f:
-    #         pickle.dump(self.partitions, f)
+
+    @topic_name.setter
+    def topic_name(self, topic_name: str):
+        self.topic_name = topic_name
+        topic_partition_keys = self.list_topics(self.topic_name).topics[self.topic_name].partitions.keys()
+        self.topic_partitions = [TopicPartition(topic_name, offset=0, partition=partition) for partition in topic_partition_keys]
+        self.assign(self.topic_partitions)
 
 
 class KafkaReader(KafkaStreamer):
 
-    @offset_storage
+    @save_offsets
     def read_topic(self, num_messages: int = -1, **kwargs):
         """
         Reads a specified number of messages in a topic.
@@ -111,7 +129,7 @@ class StreamCache(KafkaStreamer):
     def test_function(self):
         raise NotImplementedError
 
-    @offset_storage
+    @save_offsets
     def analyze_topic(self, topic_name: str, num_messages: int = -1, *args, **kwargs):
         """
         Pass a function that has a logical test using the cached information. If the test breaks it will return False.

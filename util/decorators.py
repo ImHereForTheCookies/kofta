@@ -4,7 +4,7 @@ from functools import wraps
 ___all__ = ["offset_storage"]
 
 
-def offset_storage(func):
+def save_offsets(func):
     """
     Decorator to wrap a function from a class that consumes from a kafka topic and handles when an exception occurs that
     causes the stream to be halted. This allows for functions to avoid re-reading topics from the beginning on large reads.
@@ -16,20 +16,14 @@ def offset_storage(func):
     """
     @wraps(func)
     def wrapper(self, *args, **kwargs):
-        if self.file_path is None:
-            print("No file path specified for saving or loading offsets.\n"
-                  "\tUse offsets_file in __init__ to use offset recovery.\n"
-                  "\tUse load in __init__ to recover offsets from offsets_file path")
-            if kwargs.get("load", False):
-                with open(self.file_path, 'rb') as f:
-                    self.partitions = pickle.load(f)
-        elif not kwargs.get("load", False):
-            print("Use load in __init__ to recover offsets from offsets_file path")
+        if not kwargs.get('save_path', False):
+            print("No file path specified for saving offsets.\n"
+                  "\tUse save_path in function argument to save offsets when interrupted.\n")
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
             print(e)
-            if self.file_path is not None:
+            if kwargs.get('save_path', False):
                 print(f'Saving partition offsets at {self.file_path}')
                 with open(self.file_path, 'wb') as f:
                     pickle.dump(self.partitions, f)

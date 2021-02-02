@@ -38,5 +38,5 @@ class TracePath(object):
         return {publish_id: self.trace_path(publish_id, depth=depth+1) for publish_id in self.event_mappings[search_id]
                 if search_id != publish_id}  # Avoid recursion case
 
-test = TracePath(template_solution_events)
-test.trace_path('35691264-3151-7666-3e65-86a4a2156529')
+# test = TracePath(template_solution_events)
+# test.trace_path('35691264-3151-7666-3e65-86a4a2156529')
