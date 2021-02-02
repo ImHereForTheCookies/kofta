@@ -1,20 +1,23 @@
 from confluent_kafka import Consumer, TopicPartition
-from util.decorators import save_offsets
+from util.decorators import offset_storage
 
 import json
-import time
 from tqdm import tqdm
 
 
 class KafkaStreamer(Consumer):
-    def __init__(self, kafka_address, topic_name, *args, timeout=30, configs: dict={}, offset_file=None, **kwargs):
+    def __init__(self, kafka_address, topic_name, *args, timeout=30, configs: dict = None, offset_file=None, load=False,
+                 **kwargs):
         self.kafka_address = kafka_address
-        self.topic_name = topic_name
+        self._topic_name = topic_name
         self.timeout = timeout
         self.message_count = 0
-        self.file = offset_file
+        self.file_path = offset_file
         self.messages = []
 
+        # Don't want to default to dict since mutable
+        if configs is None:
+            configs = {}
         consumer_configs = {'bootstrap.servers': self.kafka_address, 'group.id': self.topic_name}
         consumer_configs.update(configs)
 
@@ -50,7 +53,7 @@ class KafkaStreamer(Consumer):
         return self.position(self.topic_partitions)
 
     @partitions.setter
-    def partitions(self, params: dict):
+    def partitions(self, params: list):
         """
         Sets
         Args:
@@ -59,24 +62,22 @@ class KafkaStreamer(Consumer):
         Returns:
 
         """
-        topic_name = params.get('topic_name', self.topic_name)
-        offsets = params.get('offsets', [0] * len(self.topic_partitions))
-        offsets = [offsets] * len(self.topic_partitions) if type(offsets) == int else offsets
-        partitions = params.get('partitions', range(len(self.topic_partitions)))
+        self.assign(params)
+        self.topic_partitions = params
 
-        assert len(offsets) == len(partitions), "Number of partitions and offsets must be the same."
-
-        self.topic_partitions = [TopicPartition(topic_name, partition, offset) for partition, offset in zip(partitions, offsets)]
-        self.assign(self.topic_partitions)
-        time.sleep(1)
-
+    def partition_factory(self, topic_name: str, partitions: list, offsets: list):
+        pass
+    @property
+    def topic_name(self):
+        return self._topic_name
     # def save_partitions(self, save_path):
     #     with open(save_path, 'wb') as f:
     #         pickle.dump(self.partitions, f)
 
 
 class KafkaReader(KafkaStreamer):
-    @save_offsets
+
+    @offset_storage
     def read_topic(self, num_messages: int = -1, **kwargs):
         """
         Reads a specified number of messages in a topic.
@@ -110,7 +111,7 @@ class StreamCache(KafkaStreamer):
     def test_function(self):
         raise NotImplementedError
 
-    @save_offsets
+    @offset_storage
     def analyze_topic(self, topic_name: str, num_messages: int = -1, *args, **kwargs):
         """
         Pass a function that has a logical test using the cached information. If the test breaks it will return False.
@@ -146,17 +147,9 @@ class StreamCache(KafkaStreamer):
         return True
 
 
-class KafkaTransformer(KafkaStreamer):
-    def mutator(self, message):
-        raise NotImplementedError
-
-    def transform_message(self):
-        pass
-
-
 if __name__ == "__main__":
     test = KafkaReader(kafka_address='kafka-cogynt-gadoc.threatdeterrence.com:31090', topic_name="suicide_risk")
-    suicide_risk = test.read_topic()
+    suicide_risk = test.read_topic(num_messages=10)
     print('f')
 #     NUM_MESSAGES = 100000
 #     admin = AdminClient({'bootstrap.servers': 'localhost:9092'})
