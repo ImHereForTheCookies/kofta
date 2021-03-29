@@ -1,6 +1,6 @@
 import pickle
-from .. import KafkaStreamer
-from util import save_offsets
+from kufta.kafka_tools import KafkaStreamer
+from kufta.util import save_offsets
 import re
 
 

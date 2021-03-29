@@ -1,7 +1,7 @@
-from .. import KafkaStreamer
-from util.generators import number_generator, name_generator
+from kufta.kafka_tools import KafkaStreamer
+from kufta.util.generators import number_generator, name_generator
 from confluent_kafka import Producer
-from util.decorators import save_offsets
+from kufta.util.decorators import save_offsets
 
 import json
 from faker.providers.person.en import Provider

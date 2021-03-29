@@ -1,4 +1,4 @@
-from ..kafka_tools import StreamCache
+from kufta.kafka_tools import StreamCache
 
 
 class AscendingField(StreamCache):

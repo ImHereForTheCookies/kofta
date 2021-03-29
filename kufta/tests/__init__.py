@@ -1,1 +1,1 @@
-from .cache import AscendingField
+from kufta.tests.cache import AscendingField

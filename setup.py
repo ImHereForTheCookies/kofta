@@ -5,5 +5,5 @@ setup(name="kufta",
       author="Robert Meyer",
       py_modules=['kufta'],
       packages=["kufta"],
-      install_requires=['confluent_kafka', 'tqdm'],
+      install_requires=['confluent_kafka', 'tqdm', 'faker'],
       )

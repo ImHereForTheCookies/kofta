@@ -1,5 +1,5 @@
 from confluent_kafka import Consumer, TopicPartition
-from util.decorators import save_offsets
+from kufta.util.decorators import save_offsets
 
 import json
 from tqdm import tqdm
@@ -21,7 +21,7 @@ class KafkaStreamer(Consumer):
         self.readtime_count = 0
         self.messages = []
 
-        # Don't want to default to dict since mutable
+        # Don't want to default to dict since mutable default args carry across classes
         if configs is None:
             configs = {}
         consumer_configs = {'bootstrap.servers': self.kafka_address, 'group.id': self.topic_name}
@@ -167,9 +167,14 @@ class StreamCache(KafkaStreamer):
 
 
 if __name__ == "__main__":
-    test = KafkaReader(kafka_address='kafka-cogynt-gadoc.threatdeterrence.com:31090', topic_name="suicide_risk")
-    suicide_risk = test.read_topic(num_messages=10)
+    # test = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="suicide_risk")
+    # test2 = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="recent_suicide_risk")
+    test3 = KafkaReader(kafka_address='kafka-rmeyer.cogilitycloud.com:31092', topic_name='plane_data')
+    # print(len(test))
+    print(len(test3))
+    suicide_risk = test3.read_topic(num_messages=-1)
     print('f')
+    # TODO: Create venv for testing this pacckage and fix auto install and fix terminal install -> import problems
 #     NUM_MESSAGES = 100000
 #     admin = AdminClient({'bootstrap.servers': 'localhost:9092'})
 #     consumer = KafkaReader({'bootstrap.servers': 'localhost:9092',

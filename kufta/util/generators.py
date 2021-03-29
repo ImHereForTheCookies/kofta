@@ -18,7 +18,7 @@ def is_prime(n):
     return True
 
 
-def nearest_prime(num: int, round_down=True):
+def nearest_prime(num: int, round_down=False):
     if type(num) is not int:
         Warning("Provided non integer. Converting...")
         num = int(num)
@@ -31,29 +31,32 @@ def nearest_prime(num: int, round_down=True):
     return num
 
 
-def number_generator(upper_bound: int, lower_bound: int = 0, add_on_val=0, repeats=False):
+def number_generator(upper_bound: int,
+                     lower_bound: int = 0,
+                     shift_amount: int = 0,
+                     repeats: bool = False):
     """
-    Generates all unique numbers between lower_bound and upper_bound exactly once in a somewhat random way. Upper bound
-    is rounded down to the nearest prime.
+    Generates all unique numbers between lower_bound and upper_bound exactly once in a somewhat random way.
     Args:
         upper_bound: Highest value to generate (rounded down to the nearest prime)
         lower_bound: Lowest value to generate
-        add_on_val: How far to shift the values up (i.e. shift 1e10 for phone number to all have length 10)
+        shift_amount: How far to shift the values up (i.e. shift 1e10 for phone number to all have length 10)
         repeats: Whether or not to keep generating numbers after all numbers in the range have been exhausted
 
     Returns:
         Returns a generator for generating numbers as message come in.
     """
-    upper_bound = nearest_prime(upper_bound)
-    current = seed_number = nearest_prime(upper_bound * 7 // 17)
+    prime_upper_bound = nearest_prime(upper_bound)
+    # Put the first number roughly in the middle to look more random
+    current = seed_number = nearest_prime(lower_bound + (upper_bound - lower_bound) * 7 // 17)
     counter = 0
-    while repeats or counter < upper_bound:
-        yield current + add_on_val
-        current = current + seed_number % upper_bound
+    # Checks if all the numbers have been generated between lower and upper, then checks if repeats are allowed
+    while counter < upper_bound - lower_bound or repeats:
+        while current < lower_bound or current > upper_bound:
+            current = current + seed_number % prime_upper_bound
+        yield current + shift_amount
+        current = current + seed_number % prime_upper_bound
         counter += 1
-        while current < lower_bound:
-            current = current + seed_number % upper_bound
-            counter += 1
 
 
 def name_generator(first_names: list, last_names: list, repeats=False):

@@ -1,1 +1,1 @@
-from .consumers import KafkaReader, KafkaStreamer, StreamCache
+from kufta.kafka_tools.consumers import KafkaReader, KafkaStreamer, StreamCache

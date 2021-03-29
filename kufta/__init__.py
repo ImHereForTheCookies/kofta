@@ -1,1 +1,1 @@
-import kafka_tools, util
+from kufta import kafka_tools, util, tests
