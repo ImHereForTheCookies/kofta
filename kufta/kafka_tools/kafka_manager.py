@@ -2,7 +2,7 @@ from kufta.kafka_tools import KafkaReader
 from confluent_kafka.admin import AdminClient
 
 
-class Admin(AdminClient):
+class KafkaManager(AdminClient):
     def __init__(self, kafka_address: str, configs: dict = None, *args, **kwargs):
         if configs is None:
             configs = {}
@@ -11,7 +11,7 @@ class Admin(AdminClient):
 
         AdminClient.__init__(self, admin_configs, *args, **kwargs)
 
-    def delete_topic_pattern(self, pattern: str):
+    def topic_search(self, pattern: str):
         topic_list = self.list_topics()
         key_words = pattern.split('*')
         assert len(key_words) == 2, "Only one wildcard symbol supported."
@@ -20,15 +20,17 @@ class Admin(AdminClient):
         # Splitting a string on a starting symbol i.e. "*test".split("*") yields ['', test]
         if not key_words[0]:
             # Would pass for '*test' and search for all topics ending in 'test'
-            to_delete = [topic for topic in topic_list if topic.endswith(key_words[1])]
+            topics = [topic for topic in topic_list
+                      if topic.endswith(key_words[1])]
         elif not key_words[1]:
             # Would pass for 'test*' and search for all topics beginning with 'test'
-            to_delete = [topic for topic in topic_list if topic.startswith(key_words[0])]
+            topics = [topic for topic in topic_list
+                      if topic.startswith(key_words[0])]
         else:
-            to_delete = [topic for topic in topic_list if
-                         topic.startswith(key_words[0]) and topic.endswith(key_words[1])]
+            topics = [topic for topic in topic_list
+                      if topic.startswith(key_words[0]) and topic.endswith(key_words[1])]
 
-        self.delete_topics(to_delete)
+        return topics
 
     def list_topics(self):
         topic_meta_data = super().list_topics()

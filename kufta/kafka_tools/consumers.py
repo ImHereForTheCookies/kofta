@@ -87,6 +87,8 @@ class KafkaStreamer(Consumer):
     def topic_name(self):
         return self._topic_name
 
+    # TODO: fix setter so that user can enter a topic name and it will automatically read from the topic with all
+    #  partitions at offset 0
     # @topic_name.setter
     # def topic_name(self, topic_name: str):
     #     self.topic_name = topic_name
