@@ -1,3 +1,5 @@
+from faker.providers.person.en import Provider
+
 def is_prime(n):
     # Corner cases
     if n <= 1:
@@ -53,13 +55,20 @@ def number_generator(upper_bound: int,
     # Checks if all the numbers have been generated between lower and upper, then checks if repeats are allowed
     while counter < upper_bound - lower_bound or repeats:
         while current < lower_bound or current > upper_bound:
-            current = current + seed_number % prime_upper_bound
+            print(current)
+            current = (current + seed_number) % prime_upper_bound
         yield current + shift_amount
-        current = current + seed_number % prime_upper_bound
+        current = (current + seed_number) % prime_upper_bound
         counter += 1
 
 
-def name_generator(first_names: list, last_names: list, repeats=False):
+def name_generator(first_names: list = None, last_names: list = None, repeats=False):
+    if first_names is None:
+        first_names = list(set(Provider.first_names))
+
+    if last_names is None:
+        last_names = list(set(Provider.last_names))
+
     # Making the names divide each other in length makes it simple to generate names without repeats
     if len(first_names) > len(last_names):
         remainder = len(first_names) % len(last_names)
@@ -70,21 +79,26 @@ def name_generator(first_names: list, last_names: list, repeats=False):
         last_names = last_names[:-remainder]
 
     first_name_index = last_name_index = total_yielded = 0
-    while repeats or total_yielded == len(first_names) * len(last_names):
-        if first_name_index == len(first_names):
-            first_names.insert(0, first_names.pop())
-            first_name_index = 0
-        if last_name_index == len(last_names):
-            last_name_index = 0
+    while repeats or total_yielded < len(first_names) * len(last_names):
+        yield ' '.join([first_names[first_name_index], last_names[last_name_index]])
 
         total_yielded += 1
         last_name_index += 1
         first_name_index += 1
 
-        yield ' '.join([first_names[first_name_index], last_names[last_name_index]])
+        if first_name_index == len(first_names):
+            first_names.append(first_names.pop(0))
+            first_name_index = 0
+        if last_name_index == len(last_names):
+            last_name_index = 0
 
 
 # class NumberMorph(object):
 #     def __init__(self, upper_bound: int, lower_bound: int = 0, add_on_val=0, repeats=False):
 #         self.generator = number_generator(upper_bound, lower_bound, add_on_val, repeats)
 #
+
+if __name__ == '__main__':
+    test = name_generator()
+    for _ in range(100):
+        print(next(test))

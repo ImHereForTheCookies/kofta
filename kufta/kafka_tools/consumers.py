@@ -15,26 +15,32 @@ class KafkaStreamer(Consumer):
                  offset_file: str = None,
                  **kwargs):
         self.kafka_address = kafka_address
-        self._topic_name = topic_name
         self.timeout = timeout
-        self.message_count = 0
-        self.readtime_count = 0
-        self.messages = []
+        # for enabling property setters
+        self._topic_name = topic_name
+        # self.message_count = 0
+        # self.readtime_count = 0
+        # self.messages = []
 
-        # Don't want to default to dict since mutable default args carry across classes
         if configs is None:
             configs = {}
-        consumer_configs = {'bootstrap.servers': self.kafka_address, 'group.id': self.topic_name}
+        consumer_configs = {'bootstrap.servers': self.kafka_address,
+                            'group.id': 'test',
+                            # 'socket.timeout.ms': 300000,
+                            # 'session.timeout.ms': 3600000,
+                            # 'heartbeat.interval.ms': 360000,
+                            # 'max.poll.interval.ms': 36000000
+                            }
         consumer_configs.update(configs)
 
-        super().__init__(consumer_configs, *args, **kwargs)
+        Consumer.__init__(self, consumer_configs, *args, **kwargs)
         # Meta data for partition info
         if offset_file is None:
-            topic_partition_keys = self.list_topics(self.topic_name).topics[self.topic_name].partitions.keys()
-            self.topic_partitions = [TopicPartition(self.topic_name, partition=partition, offset=0) for partition in topic_partition_keys]
+            topic_partition_keys = self.list_topics().topics[topic_name].partitions.keys()
+            self.topic_partitions = [TopicPartition(topic_name, partition=partition, offset=0) for partition in topic_partition_keys]
 
         # Sets partitions to values form a specified load file
-        if offset_file is not None:
+        else:
             self.topic_partitions = pickle.load(offset_file)
 
         # Set to beginning by default
@@ -42,17 +48,18 @@ class KafkaStreamer(Consumer):
         self.assign(self.topic_partitions)
 
     def __iter__(self):
-        self.message_count = 0
-        self.readtime_count = len(self)
+        # self.message_count = 0
+        # self.readtime_count = len(self)
         return self
 
     def __next__(self):
-        if self.message_count == self.readtime_count:
-            raise EOFError
-        self.message = self.poll(timeout=self.timeout)
-        self.message = json.loads(self.message.value().decode('utf-8'))
-        return self.message
-        self.message_count += 1
+        # if self.message_count == self.readtime_count:
+        #     print(f"Read all messages for {self._topic_name}")
+        #     raise EOFError
+        message = self.poll(timeout=self.timeout)
+        # message = json.loads(message.value().decode('utf-8'))
+        # self.message_count += 1
+        return message
 
     def __len__(self):
         total = 0
@@ -87,6 +94,10 @@ class KafkaStreamer(Consumer):
     def topic_name(self):
         return self._topic_name
 
+    # def list_topics(self):
+    #     # print("kafka reader")
+    #     return super().list_topics()
+
     # TODO: fix setter so that user can enter a topic name and it will automatically read from the topic with all
     #  partitions at offset 0
     # @topic_name.setter
@@ -98,6 +109,8 @@ class KafkaStreamer(Consumer):
 
 
 class KafkaReader(KafkaStreamer):
+    messages = []
+
     @save_offsets
     def read_topic(self, num_messages: int = -1, **kwargs):
         """
@@ -112,11 +125,15 @@ class KafkaReader(KafkaStreamer):
 
         """
         self.messages = []
+        keys = kwargs.pop('kafka_key', False)
         if num_messages == -1:
             num_messages = len(self)
-        for message in tqdm(self, total=num_messages):
-            self.messages.append(message)
-            if self.message_count == num_messages:
+        for i, message in tqdm(enumerate(self, start=1), total=num_messages):
+            _decoded_message = json.loads(message.value().decode('utf-8'))
+            decoded_message =  _decoded_message if not keys else (_decoded_message, str(message.key()))
+
+            self.messages.append(decoded_message)
+            if i == num_messages:
                 break
 
 
@@ -170,11 +187,11 @@ class StreamCache(KafkaStreamer):
 
 if __name__ == "__main__":
     # test = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="suicide_risk")
-    # test2 = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="recent_suicide_risk")
-    test3 = KafkaReader(kafka_address='kafka-rmeyer.cogilitycloud.com:31092', topic_name='plane_data')
+    test2 = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="recent_suicide_risk")
+    # test3 = KafkaReader(kafka_address='kafka-rmeyer.cogilitycloud.com:31092', topic_name='plane_data')
     # print(len(test))
-    print(len(test3))
-    suicide_risk = test3.read_topic(num_messages=-1)
+    print(len(test2))
+    test2.read_topic(num_messages=-1)
     print('f')
     # TODO: Create venv for testing this pacckage and fix auto install and fix terminal install -> import problems
 #     NUM_MESSAGES = 100000
