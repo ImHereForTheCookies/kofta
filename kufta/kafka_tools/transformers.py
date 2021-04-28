@@ -1,4 +1,4 @@
-from kufta.kafka_tools import KafkaStreamer
+from kufta.kafka_tools.consumers import KafkaStreamer
 from kufta.util.generators import number_generator, name_generator
 from confluent_kafka import Producer
 from tqdm import tqdm
@@ -17,7 +17,7 @@ class KafkaTransformer(KafkaStreamer):
         self.kafka_key = kwargs.pop('kafka_key', False)
 
         configs = {'bootstrap.servers': kafka_address}
-        super().__init__(topic_name=input_topic, kafka_addres=kafka_address, *args, **kwargs)
+        super().__init__(topic_name=input_topic, kafka_address=kafka_address, *args, **kwargs)
 
         if producer_configs is not None:
             configs.update(producer_configs)
@@ -67,7 +67,7 @@ class KafkaTransformer(KafkaStreamer):
                         message[field] = next(transform)
 
                 except KeyError:
-                    print(f"{field} not found for message key: {self._message.key}")
+                    print(f"{field} not found for message key: {self._message.key()}")
         else:
             for field, transform in self.transformers.items():
                 try:
@@ -81,7 +81,7 @@ class KafkaTransformer(KafkaStreamer):
                         message[field] = next(transform)
 
                 except KeyError:
-                    print(f"{field} not found for message key: {self._message.key}")
+                    print(f"{field} not found for message key: {self._message.key()}")
         # Doesn't need to return since dict is mutable
 
     def insert_messages(self, topic_name: str, insert_rate: float, num_messages: int = -1):
@@ -99,13 +99,13 @@ class KafkaTransformer(KafkaStreamer):
             self.transform_message(decoded_message)
             self.producer.produce(topic=topic_name,
                                   value=json.dumps(decoded_message),
-                                  key=str(message.key))
+                                  key=str(message.key()))
 
             if random.random() < insert_rate:
                 self.transform_message(decoded_message, insert=True)
                 self.producer.produce(topic=topic_name,
                                       value=json.dumps(decoded_message),
-                                      key=str(message.key))
+                                      key=str(message.key()))
 
         self.producer.flush()
 
