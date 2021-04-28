@@ -1,5 +1,6 @@
 from faker.providers.person.en import Provider
 
+
 def is_prime(n):
     # Corner cases
     if n <= 1:
@@ -15,7 +16,7 @@ def is_prime(n):
     while i * i <= n:
         if n % i == 0 or n % (i + 2) == 0:
             return False
-        i = i + 6
+        i += 6
 
     return True
 
@@ -92,11 +93,6 @@ def name_generator(first_names: list = None, last_names: list = None, repeats=Fa
         if last_name_index == len(last_names):
             last_name_index = 0
 
-
-# class NumberMorph(object):
-#     def __init__(self, upper_bound: int, lower_bound: int = 0, add_on_val=0, repeats=False):
-#         self.generator = number_generator(upper_bound, lower_bound, add_on_val, repeats)
-#
 
 if __name__ == '__main__':
     test = name_generator()

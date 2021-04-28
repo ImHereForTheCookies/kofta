@@ -26,7 +26,7 @@ class KafkaManager(AdminClient):
             else:
                 all_topics = list(topics)
 
-        if isinstance(topics, list):
+        elif isinstance(topics, list):
             all_topics = []
             for topic in topics:
                 if '*' in topics:
@@ -34,6 +34,9 @@ class KafkaManager(AdminClient):
                     all_topics += new_topics
                 else:
                     all_topics.append(topic)
+
+        else:
+            raise TypeError(f"Type{type(topics)} not supported. Use list of strings or str.")
 
         return all_topics
 
@@ -57,7 +60,6 @@ class KafkaManager(AdminClient):
 
     def read_topics(self, topics: str or list, kafka_key=False):
         topic_list = self.topic_search(topics)
-        # TODO: add dynamic swap for KafkaReader using topic_name @attribute
         for topic in topic_list:
             reader = KafkaReader(kafka_address=self.kafka_address, topic_name=topic)
             reader.read_topic(num_messages=-1, kafka_key=kafka_key)
@@ -84,50 +86,49 @@ class KafkaManager(AdminClient):
             with open(Path(file).joinpath(topic + '.json'), 'w') as out:
                 json.dump(messages, out, indent=3)
 
-    def create_topics(self, topic_names: list or str, partitions: int = 10, replication: int = 3, *args, **kwargs):
-        if isinstance(topic_names, list):
+    def create_topics(self, topics: list or str, partitions: int = 10, replication: int = 3, *args, **kwargs):
+        if isinstance(topics, list):
             confluent_topics = [self._create_topic(topic_name, partitions, replication, *args, **kwargs)
-                                for topic_name in topic_names]
+                                for topic_name in topics]
         else:
-            confluent_topics = [self._create_topic(topic_names, partitions, replication, *args, **kwargs)]
+            confluent_topics = [self._create_topic(topics, partitions, replication, *args, **kwargs)]
 
-        super().create_topics(confluent_topics)
+        attempt_num = 0
         while confluent_topics:
+            if attempt_num % 3 == 0:
+                super().create_topics(confluent_topics)
             created_topics = self.list_topics()
-            time.sleep(1)
-            
-            for i, topic in reversed(list(enumerate(topic_names))):
-                if topic in created_topics:
-                    del confluent_topics[i]
-                    del topic_names[i]
 
-    def _create_topic(self, topic_name: str, partitions: int = 10, replication: int = 3, *args, **kwargs) -> NewTopic:
+            for i, new_topic in reversed(list(enumerate(confluent_topics))):
+                if new_topic.topic in created_topics:
+                    del confluent_topics[i]
+
+            attempt_num += 1
+            time.sleep(1)
+
+    @staticmethod
+    def _create_topic(topic_name: str, partitions: int = 10, replication: int = 3, *args, **kwargs) -> NewTopic:
         confluent_topic = NewTopic(topic=topic_name,
-                                  num_partitions=partitions,
-                                  replication_factor=replication,
-                                  *args, **kwargs)
+                                   num_partitions=partitions,
+                                   replication_factor=replication,
+                                   *args, **kwargs)
         return confluent_topic
 
     def delete_topics(self, topics: list):
         to_delete = self.topic_search(topics)
-        futures = super().delete_topics(to_delete, operation_timeout=30)
-
-        # for topic, future in futures.items():
-        #     try:
-        #         future.result()  # The result itself is None
-        #         print(f"Topic {future} deleted.")
-        #     except Exception as e:
-        #         print(f"Failed to delete topic {topic}: {e}")
-
+        attempt_num = 0
         while to_delete:
+            if attempt_num % 3 == 0:
+                super().delete_topics(to_delete, operation_timeout=30)
             remaining_topics = self.list_topics()
-            time.sleep(1)
 
             for i, topic in reversed(list(enumerate(to_delete))):
                 if topic not in remaining_topics:
                     del to_delete[i]
 
-    def 
+            # Time to wait until attempting next delete.
+            attempt_num += 1
+            time.sleep(1)
 
 
 if __name__ == "__main__":

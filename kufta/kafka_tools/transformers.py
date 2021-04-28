@@ -1,51 +1,115 @@
 from kufta.kafka_tools import KafkaStreamer
 from kufta.util.generators import number_generator, name_generator
 from confluent_kafka import Producer
-from kufta.util.decorators import save_offsets
+from tqdm import tqdm
 
+import types
 import json
+import random
 
 
 class KafkaTransformer(KafkaStreamer):
     def __init__(self,
+                 kafka_address: str,
+                 input_topic: str,
                  producer_configs: dict = None,
                  *args, **kwargs):
         self.kafka_key = kwargs.pop('kafka_key', False)
 
-        configs = {'bootstrap.servers': kwargs.get('kafka_address')}
+        configs = {'bootstrap.servers': kafka_address}
+        super().__init__(topic_name=input_topic, kafka_addres=kafka_address, *args, **kwargs)
+
         if producer_configs is not None:
             configs.update(producer_configs)
 
         self.producer = Producer(configs)
 
-        super().__init__(*args, **kwargs)
         self.transformers = {}
+        self.insert_transformers = {}
+
         self.mappings = {}
 
-    def add_transformer(self, field_name: str, generator: callable):
-        self.transformers[field_name] = generator
-
-    def transformer(self, message):
-        raise NotImplementedError
+    def add_transformer(self, field_name: str, mapping: callable or iter, insert=False):
+        if insert:
+            self.insert_transformers[field_name] = mapping
+        else:
+            self.transformers[field_name] = mapping
 
     # @save_offsets
-    # TODO: fix dictionary from add_transformer to take transformers and generators
     def transform_messages(self, topic_name: str, num_messages: int = -1):
-        for i, message in enumerate(self):
+        size = len(self)
+        num_messages = num_messages if num_messages < size else size
+        num_messages = num_messages if num_messages != -1 else len(self)
+        for i, message in tqdm(enumerate(self), total=num_messages):
             if i == num_messages:
                 break
 
             if i % 10000 == 0:
                 self.producer.flush()
-            decoded = json.loads(message.value().decode('utf-8'))
-            for field, transform in self.transformers.items():
-                decoded[field] = next(transform)
+            decoded_message = json.loads(message.value().decode('utf-8'))
+            self.transform_message(decoded_message)
+
             self.producer.produce(topic=topic_name,
-                                  value=json.dumps(decoded),
+                                  value=json.dumps(decoded_message),
                                   key=str(message.key))
 
+    def transform_message(self, message: dict, insert=False):
+        if insert:
+            for field, transform in self.insert_transformers.items():
+                try:
+                    if transform == 'delete':
+                        del message[field]
 
-# TODO: There should be a way to use a structure that iterates and maps more automatically
+                    elif isinstance(transform, types.FunctionType):
+                        message[field] = transform(message)
+
+                    elif isinstance(transform, types.GeneratorType):
+                        message[field] = next(transform)
+
+                except KeyError:
+                    print(f"{field} not found for message key: {self._message.key}")
+        else:
+            for field, transform in self.transformers.items():
+                try:
+                    if transform == 'delete':
+                        del message[field]
+
+                    elif isinstance(transform, types.FunctionType):
+                        message[field] = transform(message)
+
+                    elif isinstance(transform, types.GeneratorType):
+                        message[field] = next(transform)
+
+                except KeyError:
+                    print(f"{field} not found for message key: {self._message.key}")
+        # Doesn't need to return since dict is mutable
+
+    def insert_messages(self, topic_name: str, insert_rate: float, num_messages: int = -1):
+        size = len(self)
+        num_messages = num_messages if num_messages < size else size
+        num_messages = num_messages if num_messages != -1 else size
+        for i, message in tqdm(enumerate(self), total=num_messages):
+            if i == num_messages:
+                break
+
+            if i % 10000 == 0:
+                self.producer.flush()
+
+            decoded_message = json.loads(message.value().decode('utf-8'))
+            self.transform_message(decoded_message)
+            self.producer.produce(topic=topic_name,
+                                  value=json.dumps(decoded_message),
+                                  key=str(message.key))
+
+            if random.random() < insert_rate:
+                self.transform_message(decoded_message, insert=True)
+                self.producer.produce(topic=topic_name,
+                                      value=json.dumps(decoded_message),
+                                      key=str(message.key))
+
+        self.producer.flush()
+
+
 class GadocTransformer(KafkaTransformer):
     def __init__(self, kafka_address: str, topic_name: str, **kwargs):
         super().__init__(kafka_address, topic_name, **kwargs)

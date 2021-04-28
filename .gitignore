@@ -1,6 +1,7 @@
 kufta.egg-info
+scripts/
 .DS_Store
 __pycache__
 .idea
 venv/
-
+*.json

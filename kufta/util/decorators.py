@@ -21,6 +21,7 @@ def save_offsets(func):
                   "\tUse save_path in function argument to save offsets when interrupted.\n")
         try:
             return func(self, *args, **kwargs)
+        # This except is trash. Wrappers with blanket except lulw?
         except Exception as e:
             print(e)
             if kwargs.get('save_path', False):
