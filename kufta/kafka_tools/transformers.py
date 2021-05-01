@@ -27,13 +27,20 @@ class KafkaTransformer(KafkaStreamer):
         self.transformers = {}
         self.insert_transformers = {}
 
+        self.casting = {}
+        self.insert_casting = {}
+
         self.mappings = {}
 
-    def add_transformer(self, field_name: str, mapping: callable or iter, insert=False):
+    def add_transformer(self, field_name: str, mapping: callable or iter, insert=False, cast: type=None):
         if insert:
             self.insert_transformers[field_name] = mapping
+            if cast is not None:
+                self.insert_casting[field_name] = cast
         else:
             self.transformers[field_name] = mapping
+            if cast is not None:
+                self.casting[field_name] = cast
 
     # @save_offsets
     def transform_messages(self, topic_name: str, num_messages: int = -1):
@@ -68,6 +75,9 @@ class KafkaTransformer(KafkaStreamer):
 
                 except KeyError:
                     print(f"{field} not found for message key: {self._message.key()}")
+
+                if field in self.casting.keys():
+                    message[field] = self.casting[field](message[field])
         else:
             for field, transform in self.transformers.items():
                 try:
@@ -82,6 +92,10 @@ class KafkaTransformer(KafkaStreamer):
 
                 except KeyError:
                     print(f"{field} not found for message key: {self._message.key()}")
+
+                if field in self.casting.keys():
+                    message[field] = self.casting[field](message[field])
+
         # Doesn't need to return since dict is mutable
 
     def insert_messages(self, topic_name: str, insert_rate: float, num_messages: int = -1):
