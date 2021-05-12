@@ -1,66 +1,69 @@
 from faker.providers.person.en import Provider
+import random
+import math
 
 
-def is_prime(n):
-    # Corner cases
-    if n <= 1:
-        return False
-    if n <= 3:
-        return True
+# Return a randomized "range" using a Linear Congruential Generator
+# to produce the number sequence. Parameters are the same as for
+# python builtin "range".
+#   Memory  -- storage for 8 integers, regardless of parameters.
+#   Compute -- at most 2*"maximum" steps required to generate sequence.
+#
+def random_range(start, stop=None, step=None, seed=None):
+    # Set a default values the same way "range" does.
+    if stop is None:
+        start, stop = 0, start
+    if step is None:
+        step = 1
+    # Use a mapping to convert a standard range into the desired range.
+    mapping = lambda i: (i*step) + start
+    # Compute the number of numbers in this range.
+    maximum = (stop - start) // step
+    # Seed range with a random integer.
+    if seed is not None:
+        random.seed(seed)
+    value = random.randint(0, maximum)
+    #
+    # Construct an offset, multiplier, and modulus for a linear
+    # congruential generator. These generators are cyclic and
+    # non-repeating when they maintain the properties:
+    #
+    #   1) "modulus" and "offset" are relatively prime.
+    #   2) ["multiplier" - 1] is divisible by all prime factors of "modulus".
+    #   3) ["multiplier" - 1] is divisible by 4 if "modulus" is divisible by 4.
+    #
+    offset = random.randint(0, maximum) * 2 + 1       # Pick a random odd-valued offset.
+    multiplier = 4 * (maximum // 4) + 1               # Pick a multiplier 1 greater than a multiple of 4.
+    modulus = int(2 ** math.ceil(math.log2(maximum))) # Pick a modulus just big enough to generate all numbers (power of 2).
+    # Track how many random numbers have been returned.
+    found = 0
+    while found < maximum:
+        # If this is a valid value, yield it in generator fashion.
+        if value < maximum:
+            found += 1
+            yield mapping(value)
+        # Calculate the next value in the sequence.
+        value = (value * multiplier + offset) % modulus
 
-    # This is checked so that we can skip the middle five numbers in the loop below
-    if n % 2 == 0 or n % 3 == 0:
-        return False
 
-    i = 5
-    while i * i <= n:
-        if n % i == 0 or n % (i + 2) == 0:
-            return False
-        i += 6
-
-    return True
-
-
-def nearest_prime(num: int, round_down=False):
-    if type(num) is not int:
-        Warning("Provided non integer. Converting...")
-        num = int(num)
-
-    while not is_prime(num):
-        if round_down:
-            num -= 1
-        else:
-            num += 1
-    return num
-
-
-def number_generator(upper_bound: int,
-                     lower_bound: int = 0,
-                     shift_amount: int = 0,
-                     repeats: bool = False):
+def ip_address_generator(seed: int=None):
     """
-    Generates all unique numbers between lower_bound and upper_bound exactly once in a somewhat random way.
+    Generates ips with four randomint(1,256) joined by a dot. Can be improved by ensuring uniqueness for
+    all 256 ** 4 outcomes in 256 ** 4 generations. First 100,000 are guaranteed unique.
     Args:
-        upper_bound: Highest value to generate (rounded down to the nearest prime)
-        lower_bound: Lowest value to generate
-        shift_amount: How far to shift the values up (i.e. shift 1e10 for phone number to all have length 10)
-        repeats: Whether or not to keep generating numbers after all numbers in the range have been exhausted
+        seed: Any number to serve as a starting seed for random.seed
 
     Returns:
-        Returns a generator for generating numbers as message come in.
+        ip address formatted xxx.xxx.xxx.xxx
     """
-    prime_upper_bound = nearest_prime(upper_bound)
-    # Put the first number roughly in the middle to look more random
-    current = seed_number = nearest_prime(lower_bound + (upper_bound - lower_bound) * 7 // 17)
-    counter = 0
-    # Checks if all the numbers have been generated between lower and upper, then checks if repeats are allowed
-    while counter < upper_bound - lower_bound or repeats:
-        while current < lower_bound or current > upper_bound:
-            print(current)
-            current = (current + seed_number) % prime_upper_bound
-        yield current + shift_amount
-        current = (current + seed_number) % prime_upper_bound
-        counter += 1
+    if seed is not None:
+        random.seed(seed)
+
+    while True:
+        yield '.'.join([random.randint(1, 256) for _ in range(4)])
+        if seed is not None:
+            seed += 1
+            random.seed(seed)
 
 
 def name_generator(first_names: list = None, last_names: list = None, repeats=False):
