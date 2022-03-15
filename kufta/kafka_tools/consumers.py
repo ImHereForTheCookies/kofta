@@ -164,35 +164,4 @@ class StreamCache(KafkaStreamer):
                 return False
 
         return True
-
-
-if __name__ == "__main__":
-    # test = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="suicide_risk")
-    # test2 = KafkaReader(kafka_address='kafka-cogynt-gadoc-V2.threatdeterrence.com:31090', topic_name="recent_suicide_risk")
-    test3 = KafkaReader(kafka_address='kafka-rmeyer.cogilitycloud.com:31092', topic_name='plane_data')
-    test3.topic_name = 'plane_data'
-    # print(len(test))
-    # print(len(test2))
-    # test2.read_topic(num_messages=-1)
-    print('f')
-#     NUM_MESSAGES = 100000
-#     admin = AdminClient({'bootstrap.servers': 'localhost:9092'})
-#     consumer = KafkaReader({'bootstrap.servers': 'localhost:9092',
-#                             'group.id': 'consumer_test'},
-#                            timeout=1)
-#     producer = Producer({'bootstrap.servers': 'localhost:9092'})
-#
-#     admin.delete_topics(['unit_test'])
-#     time.sleep(1)
-#
-#     sent_messages = []
-#     for i in range(NUM_MESSAGES):
-#         sent_message = {'field': i}
-#         sent_messages.append(sent_message)
-#         producer.produce('unit_test',
-#                          value=json.dumps(sent_message))
-#
-#     read_messages = consumer.read_topic('unit_test')
-#
-#     assert sent_messages == read_messages, 'Unit test failed for reading messages'
-#     assert consumer.total_messages('unit_test') == NUM_MESSAGES, "Unit test failed for counting messages"
+    
